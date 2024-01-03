@@ -214,7 +214,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
 
     })
     .workers(4) // Set the number of worker threads
-    .bind((hostname.as_ref(), port))?
+    .bind(("0.0.0.0", port))?
     .run()
     .await
 }

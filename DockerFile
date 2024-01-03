@@ -1,5 +1,5 @@
 # Use a Rust image to build the application
-FROM rust:latest as builder
+FROM rust:slim-bookworm as builder
 
 # # Create a new empty shell project
 # RUN USER=root cargo new --bin rust_server
@@ -16,12 +16,14 @@ RUN rm src/*.rs
 
 # Copy Deps
 COPY ./src ./src
+RUN touch ./src/main.rs
+RUN touch ./src/lib.rs
 
 # Build for release
 RUN cargo build --release
 
 # Use a smaller image to run the application
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 
 # # Install OpenSSL - if your app depends on it
 # RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
