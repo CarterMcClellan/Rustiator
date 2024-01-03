@@ -2,7 +2,7 @@
 
 A simple chess server + client, to run 2 chess engines and watch them play!
 
-![Chess Bot Battle](readme_assets/chess_battle.jpg)
+<img src="readme_assets/chess_battle.jpg" alt="Chess Bot Battle" width="300" height="300"/>
 
 To start the server
 ```
