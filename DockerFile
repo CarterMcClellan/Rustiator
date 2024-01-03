@@ -1,10 +1,6 @@
 # Use a Rust image to build the application
 FROM rust:slim-bookworm as builder
 
-# # Create a new empty shell project
-# RUN USER=root cargo new --bin rust_server
-# WORKDIR /rust_server
-
 # Copy your manifests
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
@@ -25,17 +21,9 @@ RUN cargo build --release
 # Use a smaller image to run the application
 FROM debian:bookworm-slim
 
-# # Install OpenSSL - if your app depends on it
-# RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
-
 # Copy the build artifact from the build stage
 COPY --from=builder /target/release/server .
-
-# Copy static files (HTML, JS) - adjust the path according to your project structure
 COPY ./client ./client
-
-# # Expose the port the server is running on
-# EXPOSE 8080
 
 # Run the binary
 CMD ["./server"]
