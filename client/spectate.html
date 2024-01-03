@@ -36,7 +36,7 @@
         board = Chessboard('board1', config);
 
         // WebSocket initialization
-        var socket = new WebSocket('ws://127.0.0.1:8080/ws/');
+        var socket = new WebSocket(`ws://${window.location.host}/ws/`);
 
         socket.onopen = function(event) {
             console.log("WebSocket connection established");

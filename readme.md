@@ -12,4 +12,6 @@ cargo run
 This should automatically open your webbrowser to `localhost:8080`. 
 
 # Adjusting Hostname and Port
-Currently the client side code is hardcoded to point at localhost:8080, so nothing else will work :/
+```
+cargo run -- --port <port> --hostname <host>
+```
