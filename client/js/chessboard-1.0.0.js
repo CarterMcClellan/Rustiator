@@ -5,6 +5,9 @@
 // Released under the MIT license
 // https://github.com/oakmac/chessboardjs/blob/master/LICENSE.md
 
+
+// Rustiator note: only one small modification on where the images are pulled from
+
 // start anonymous scope
 ;(function () {
   'use strict'

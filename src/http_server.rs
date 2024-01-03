@@ -136,8 +136,8 @@ async fn spectate_game(
 
     let position = gd_lock.fen();
     let css_content =
-        std::fs::read_to_string("../client/css/chessboard-1.0.0.min.css").unwrap();
-    let js_content = std::fs::read_to_string("../client/js/ugly.chess.js").unwrap();
+        std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
+    let js_content = std::fs::read_to_string("./client/js/chessboard-1.0.0.js").unwrap();
 
     // Create data to fill the template
     let data = json!({
@@ -180,7 +180,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
 
     let mut handlebars = Handlebars::new();
     handlebars
-        .register_template_file("spectate_template", "../client/spectate.html")
+        .register_template_file("spectate_template", "./client/spectate.html")
         .unwrap(); // lol fix
     let handlebars_ref = web::Data::new(handlebars);
 
@@ -209,8 +209,8 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .route("/ws/", web::get().to(ws_index))
             .service(spectate_game)
             .service(new_game)
-            .service(fs::Files::new("/", "../tiny_client/").index_file("index.html"))
-            .service(fs::Files::new("/img", "../tiny_client/img"))
+            .service(fs::Files::new("/", "./client/").index_file("index.html"))
+            .service(fs::Files::new("/img", "./client/img"))
 
     })
     .workers(4) // Set the number of worker threads
