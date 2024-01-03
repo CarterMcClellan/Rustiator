@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #board1 {
+            width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div id="setup">
+        <button id="botVsBotWhite">Bot Plays Bot</button>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $("#botVsBotWhite").click(function(event) {
+                event.preventDefault();
+                startGame('botVsBot');
+            });
+        });
+
+        async function startGame(mode) {
+            console.log("input", JSON.stringify({
+                mode: mode,
+            }));
+            var response = await fetch('http://localhost:8080/new_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    mode: mode,
+                })
+            });
+
+            console.log("received response");
+
+            if (response.ok) {
+                const data = await response.json();
+                const game_id = data.game_id;
+
+                if (mode === 'playerVsBot') {
+                    window.location.href = `/${game_id}`;
+                } else if (mode === 'botVsBot') {
+                    console.log(`http://localhost:8080/spectate/${game_id}`);
+                    window.location.href = `/spectate/${game_id}`;
+                }
+            } else {
+                console.error('Failed to fetch:', response.statusText);
+            }
+        }
+    </script>
+</body>
+</html>

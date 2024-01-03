@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess</title>
+    <style>
+        {{{style}}}
+    </style>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #board1 {
+            width: 400px;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+</head>
+<body>
+    <div id="board1"></div>
+    <script>
+        {{{board_js}}}
+    </script>
+    <script>
+        var board = null;
+        var gameId = "{{game_id}}";
+        var position = "{{position}}";
+        var config = {
+            draggable: true,
+            position: position,
+        }
+        board = Chessboard('board1', config);
+
+        // WebSocket initialization
+        var socket = new WebSocket('ws://127.0.0.1:8080/ws/');
+
+        socket.onopen = function(event) {
+            console.log("WebSocket connection established");
+        };
+
+        socket.onmessage = function(event) {
+            console.log("WebSocket message received:", event.data);
+            var data = event.data;
+            board.position(data);
+        };
+
+        socket.onerror = function(error) {
+            console.error("WebSocket Error: ", error);
+        };
+
+        socket.onclose = function(event) {
+                if (event.wasClean) {
+                    console.log(`Connection closed cleanly, code=${event.code}, reason=${event.reason}`);
+                } else {
+                    console.error('Connection died');
+                }
+        };
+
+    </script>
+</body>
+</html>

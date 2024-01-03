@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess</title>
+    <link rel="stylesheet" href="css/chessboard-1.0.0.min.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #board1 {
+            width: 400px;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+    <script src="js/chessboard-1.0.0.min.js"></script>
+</head>
+<body>
+    <div id="board1"></div>
+    <script>
+        var board = null;
+
+        // template variables
+        var validMoves = {{{ serde_json::to_string(&valid_moves).unwrap_or("[]".to_string()) }}};
+        var perspective = "{{perspective}}";
+        var position = "{{position}}";
+        var playersTurn = false;
+        var gameOver = false;
+        var mode = 'playerVsBot';
+        console.log("fen starting position", position)
+
+        var config = {
+            draggable: true,
+            position: position,
+            orientation: perspective,
+            onDragStart: onDragStart,
+            onDrop: onDrop
+        }
+        board = Chessboard('board1', config)
+
+        function onDragStart (source, piece, position, orientation) {
+            if (mode === 'playerVsBot') {
+                if (gameOver) return false
+                if (playersTurn) return false
+            } else if (mode === 'botVsBot') {
+                return false
+            }
+
+            // only pick up pieces for White
+            if (piece.search(new RegExp('^' + botColor)) !== -1) return false
+
+            // don't allow user to make invlid moves (duh)
+            if (!piece.isIn(validMoves)) return false
+        }        
+        
+        function onDrop(source, target) {
+            // notes: 
+            // 1) guaranteed to be a valid move (by onDragStart)
+            // 2) currently user can only promote to queen
+            var move = {
+                from: source,
+                to: target,
+                promotion: 'q' 
+            };
+            movePiece(move)
+        }
+
+        // Move Piece, update board, and set playerTurn to false
+        async function movePiece(move) {
+           playerTurn = false; 
+           var response = await fetch('http://localhost:8080/new_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    player_vs_bot: true, // assuming mode is a boolean
+                    play_as_white: true// assuming color is a boolean
+                })
+            });
+        }
+
+    </script>
+</body>
+</html>
