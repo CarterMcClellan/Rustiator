@@ -34,7 +34,7 @@
             console.log("input", JSON.stringify({
                 mode: mode,
             }));
-            var response = await fetch('http://localhost:8080/new_game', {
+            var response = await fetch('/new_game', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -53,7 +53,7 @@
                 if (mode === 'playerVsBot') {
                     window.location.href = `/${game_id}`;
                 } else if (mode === 'botVsBot') {
-                    console.log(`http://localhost:8080/spectate/${game_id}`);
+                    console.log(`/spectate/${game_id}`);
                     window.location.href = `/spectate/${game_id}`;
                 }
             } else {

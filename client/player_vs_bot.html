@@ -72,7 +72,7 @@
         // Move Piece, update board, and set playerTurn to false
         async function movePiece(move) {
            playerTurn = false; 
-           var response = await fetch('http://localhost:8080/new_game', {
+           var response = await fetch('/new_game', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
