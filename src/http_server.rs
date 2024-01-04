@@ -2,11 +2,11 @@ use actix::Addr;
 use actix_web::Error;
 use actix_web_actors::ws;
 use std::sync::mpsc;
-use tokio::task::JoinHandle as SJoinHandle;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, RwLock},
 };
+use tokio::task::JoinSet;
 
 use actix_cors::Cors;
 use actix_files as fs;
@@ -40,7 +40,7 @@ async fn ping() -> impl Responder {
 #[post("/new_game")]
 async fn new_game(
     app_data: web::Data<GameMap>,
-    active_processes: web::Data<Arc<Mutex<HashMap<Uuid, SJoinHandle<()>>>>>,
+    active_processes: web::Data<Arc<Mutex<HashMap<Uuid, JoinSet<()>>>>>,
     connections: web::Data<SharedState>,
     req_body: Json<NewGameArgs>,
 ) -> impl Responder {
@@ -66,19 +66,15 @@ async fn new_game(
 
             let (tx, rx) = mpsc::channel();
 
-            // TODO need to figure this out, for some reason when I spawn
-            // using a tokio thread the game run's but the re-direct blocks
-            // until the game completes
-            let engine_handle = tokio::task::spawn_blocking(move || {
+            let mut game_join_set = JoinSet::new();
+
+            game_join_set.spawn_blocking(move || {
                 println!("Spawning new task for game {}", new_game_id);
                 engine_vs_engine(game_clone, engine1_clone, engine2_clone, tx);
             });
-            // let engine_handle = std::thread::spawn(move || {
-            //     engine_vs_engine(game_clone, engine1_clone, engine2_clone, tx);
-            // });
 
             let connections_clone = connections.clone();
-            std::thread::spawn(move || {
+            game_join_set.spawn_blocking(move || {
                 loop {
                     let result = match rx.recv() {
                         Ok(message) => message,
@@ -97,10 +93,10 @@ async fn new_game(
 
             println!("engine + misc threads spawned for game {}", new_game_id);
 
-            // not doing anything with handle right now, but save in case in the future
+            // not doing anything with set right now, but save in case in the future
             // we want to do some graceful shutdown logic
             let mut active_tasks = active_processes.lock().unwrap();
-            active_tasks.insert(new_game_id, engine_handle);
+            active_tasks.insert(new_game_id, game_join_set);
 
             println!("inserted game {} into active tasks", new_game_id);
             app_data.insert(new_game_id, game);
@@ -170,7 +166,7 @@ pub async fn ws_index(
 pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     // Init an empty hashmap to store all the ongoing processes
     let active = Arc::new(Mutex::new(
-        std::collections::HashMap::<Uuid, SJoinHandle<()>>::new(),
+        HashMap::<Uuid, JoinSet<()>>::new(),
     ));
     let active_tasks = web::Data::new(active);
 
