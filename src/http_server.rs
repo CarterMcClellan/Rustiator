@@ -2,7 +2,7 @@ use actix::Addr;
 use actix_web::Error;
 use actix_web_actors::ws;
 use std::sync::mpsc;
-use std::thread::JoinHandle as SJoinHandle;
+use tokio::task::JoinHandle as SJoinHandle;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, RwLock},
@@ -69,13 +69,13 @@ async fn new_game(
             // TODO need to figure this out, for some reason when I spawn
             // using a tokio thread the game run's but the re-direct blocks
             // until the game completes
-            // let engine_handle = tokio::spawn(async move {
-            //     println!("Spawning new task for game {}", new_game_id);
-            //     engine_vs_engine(game_clone, engine1_clone, engine2_clone, tx);
-            // });
-            let engine_handle = std::thread::spawn(move || {
+            let engine_handle = tokio::task::spawn_blocking(move || {
+                println!("Spawning new task for game {}", new_game_id);
                 engine_vs_engine(game_clone, engine1_clone, engine2_clone, tx);
             });
+            // let engine_handle = std::thread::spawn(move || {
+            //     engine_vs_engine(game_clone, engine1_clone, engine2_clone, tx);
+            // });
 
             let connections_clone = connections.clone();
             std::thread::spawn(move || {
