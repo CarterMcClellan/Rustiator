@@ -41,7 +41,7 @@ async fn ping() -> impl Responder {
 async fn new_game(
     app_data: web::Data<GameMap>,
     active_processes: web::Data<Arc<Mutex<HashMap<Uuid, JoinSet<()>>>>>,
-    connections: web::Data<SharedState>,
+    connections: web::Data<DashMap<Uuid, SharedState>>,
     req_body: Json<NewGameArgs>,
 ) -> impl Responder {
 
@@ -55,7 +55,6 @@ async fn new_game(
             app_data.insert(new_game_id, game);
         }
         "botVsBot" => {
-            println!("bot vs bot");
             let game = Arc::new(RwLock::new(ChessGame::new()));
             let engine1 = Arc::new(crate::chess_engine::RandomEngine::new());
             let engine2 = Arc::new(crate::chess_engine::RandomEngine::new());
@@ -69,11 +68,11 @@ async fn new_game(
             let mut game_join_set = JoinSet::new();
 
             game_join_set.spawn_blocking(move || {
-                println!("Spawning new task for game {}", new_game_id);
                 engine_vs_engine(game_clone, engine1_clone, engine2_clone, tx);
             });
 
-            let connections_clone = connections.clone();
+            let new_game_connections: SharedState = Arc::new(RwLock::new(Vec::new()));
+            connections.insert(new_game_id, new_game_connections.clone());
             game_join_set.spawn_blocking(move || {
                 loop {
                     let result = match rx.recv() {
@@ -84,14 +83,12 @@ async fn new_game(
                         }
                     };
             
-                    let connections_clone = connections_clone.read().unwrap();
+                    let connections_clone = new_game_connections.read().unwrap();
                     for conn in connections_clone.iter() {
                         conn.do_send(result.clone()); 
                     }
                 }
             });
-
-            println!("engine + misc threads spawned for game {}", new_game_id);
 
             // not doing anything with set right now, but save in case in the future
             // we want to do some graceful shutdown logic
@@ -155,14 +152,23 @@ async fn spectate_game(
 pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
-    connections: web::Data<SharedState>
+    uuid: web::Path<Uuid>, // Extract UUID from the path
+    connections: web::Data<DashMap<Uuid, SharedState>>
 ) -> Result<HttpResponse, Error> {
-    println!("New Connection!");
-    let conns: SharedState = connections.get_ref().clone();
-    let ws = MyWebSocket::new(conns);
-    ws::start(ws, &req, stream)
+    println!("New Connection to Game: {}", &uuid);
+    match connections.get(&uuid) {
+        Some(game_conns) => {
+            let game_conns: SharedState = game_conns.clone();
+            let ws = MyWebSocket::new(game_conns);
+            ws::start(ws, &req, stream)
+        }
+        None => {
+            let err_msg = format!("Room {} not found", &uuid);
+            let err = std::io::Error::new(std::io::ErrorKind::NotFound, err_msg);
+            return Err(err.into());
+        }
+    }
 }
-
 pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     // Init an empty hashmap to store all the ongoing processes
     let active = Arc::new(Mutex::new(
@@ -181,7 +187,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     let handlebars_ref = web::Data::new(handlebars);
 
     // Active Spectator connections 
-    let connections: SharedState = Arc::new(RwLock::new(Vec::new()));
+    let connections: DashMap<Uuid, SharedState> = DashMap::new();
     let connections_data = web::Data::new(connections);
 
     println!("Starting server on {}:{}", hostname, port);
@@ -202,7 +208,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .app_data(handlebars_ref.clone())
             .app_data(active_tasks.clone())
             .app_data(connections_data.clone())
-            .route("/ws/", web::get().to(ws_index))
+            .route("/ws/{uuid}", web::get().to(ws_index))
             .service(spectate_game)
             .service(new_game)
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
