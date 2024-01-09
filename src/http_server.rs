@@ -193,12 +193,16 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     println!("Starting server on {}:{}", hostname, port);
     let allowed_origin = format!("http://{}:{}", &hostname, &port);
     HttpServer::new(move || {
-        let cors = Cors::default()
+        let mut cors = Cors::default()
             .allowed_origin(&allowed_origin)
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
             .allowed_header(http::header::CONTENT_TYPE)
             .max_age(3600);
+
+        if port == 80 {
+            cors = cors.allowed_origin(&format!("http://{hostname}"))
+        }
 
         // because we are doing a wildcard match with render game, the order of the
         // routes actually does matter here
