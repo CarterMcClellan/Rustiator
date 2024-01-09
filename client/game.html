@@ -52,6 +52,9 @@
           oldPosition,
           currentOrientation
         ) {
+            if (draggedPieceSource === draggedPieceDest) {
+                return;
+            }
             // This is most definitely incomplete
             var uci = draggedPieceSource + draggedPieceDest;
 
@@ -83,6 +86,7 @@
                 return state;
             } else {
                 console.error('Error Sending Request:', response.statusText);
+                console.error('Full Response', response);
             }
         }
 

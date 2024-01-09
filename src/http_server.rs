@@ -1,5 +1,4 @@
 use actix::Addr;
-use actix_web::Error;
 use actix_web_actors::ws;
 use std::sync::mpsc;
 use std::{
@@ -12,6 +11,7 @@ use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{
     get, http, post, web, web::Json, App, HttpRequest, HttpResponse, HttpServer, Responder,
+    Error, middleware,
 };
 
 use log::{info, error};
@@ -226,7 +226,16 @@ pub async fn player_vs_bot(
             ))
         })?;
 
-    game.play_move(player_move);
+    match game.play_move(player_move) {
+        Ok(_) => {},
+        Err(e) => {
+            error!("Error playing move: {}", e);
+            return Err(actix_web::error::ErrorBadRequest(format!(
+                "Error Playing Move {}: {e}",
+                req_body.player_move
+            )));
+        }
+    }
 
     Ok(Json(PlayGameResponse {
         board_state: game.fen(),
@@ -323,7 +332,12 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .service(player_vs_bot)
             .service(play_game_entry)
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
-            .service(fs::Files::new("/img", "./client/img"))
+            // .service(fs::Files::new("/img", "./client/img"))
+            .service(
+                web::scope("/img")
+                    .wrap(middleware::DefaultHeaders::new().header("Cache-Control", "public, max-age=86400"))
+                    .service(fs::Files::new("", "./client/img").use_last_modified(true))
+            )
 
     })
     .workers(4) // Set the number of worker threads
