@@ -58,7 +58,7 @@ pub fn engine_vs_engine<T: ChooseMove>(
 
             if let Some(m) = engine.choose_move(&fen, &legal_moves) {
                 update_moves_counter(&mut moves_without_capture, m.is_capture());
-                game.make_move(m);
+                game.make_move(&m);
                 send_notification(&sender_channel, game.fen());
             } else {
                 info!("Game over, other engine wins or stalemate");

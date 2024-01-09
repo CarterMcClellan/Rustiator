@@ -18,9 +18,11 @@ use log::{info, error};
 
 use dashmap::DashMap;
 use handlebars::Handlebars;
-use serde::Deserialize;
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize};
 use serde_json::json;
 use uuid::Uuid;
+
+use shakmaty::uci::Uci;
 
 use crate::chess_engine;
 use crate::websocket::MyWebSocket;
@@ -59,7 +61,7 @@ async fn new_game(
             // TODO: allow bot id in request body to select bot to play here
             let bot = chess_engine::RandomEngine::new();
             let game = PlayerGame::new(bot);
-            log::info!("Starting Player vs Bot Game: {new_game_id}");
+            info!("Starting Player vs Bot Game: {new_game_id}");
             active_player_games.insert(new_game_id, game);
         }
         "botVsBot" => {
@@ -177,6 +179,57 @@ pub async fn ws_index(
         }
     }
 }
+
+#[derive(Deserialize, Debug)]
+struct PlayGameArgs {
+    #[serde(rename = "move", deserialize_with = "parse_uci")]
+    /// Move in UCI notation
+    player_move: Uci,
+}
+
+fn parse_uci<'de, D>(deserializer: D) -> Result<Uci, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bytes: &[u8] = Deserialize::deserialize(deserializer)?;
+    Uci::from_ascii(bytes).map_err(D::Error::custom)
+}
+
+#[derive(Serialize, Debug)]
+struct PlayGameResponse {
+    /// State in fen representation
+    board_state: String,
+}
+
+#[post("/play/{uuid}")]
+pub async fn player_vs_bot(
+    active_player_games: web::Data<DashMap<Uuid, PlayerGame>>,
+    req_body: Json<PlayGameArgs>,
+    uuid: web::Path<Uuid>,
+) -> actix_web::Result<Json<PlayGameResponse>> {
+    let Some(mut game) = active_player_games.get_mut(&uuid) else {
+        return Err(actix_web::error::ErrorBadRequest(format!(
+            "No active game for {uuid}"
+        )));
+    };
+
+    let player_move = req_body
+        .player_move
+        .to_move(&game.game.game /*lmao*/)
+        .map_err(|e| {
+            actix_web::error::ErrorBadRequest(format!(
+                "Error Playing Move {}: {e}",
+                req_body.player_move
+            ))
+        })?;
+
+    game.play_move(player_move);
+
+    Ok(Json(PlayGameResponse {
+        board_state: game.fen(),
+    }))
+}
+
 pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     // Init an empty hashmap to store all the ongoing processes
     let active = Arc::new(Mutex::new(
@@ -226,6 +279,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .route("/ws/{uuid}", web::get().to(ws_index))
             .service(spectate_game)
             .service(new_game)
+            .service(player_vs_bot)
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
             .service(fs::Files::new("/img", "./client/img"))
 

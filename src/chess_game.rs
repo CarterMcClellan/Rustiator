@@ -219,8 +219,8 @@ impl ChessGame {
     }
 
     // Makes a move, if it is legal
-    pub fn make_move(&mut self, m: Move) {
-        self.game.play_unchecked(&m);
+    pub fn make_move(&mut self, m: &Move) {
+        self.game.play_unchecked(m);
     }
 
     // Returns a list of legal moves
