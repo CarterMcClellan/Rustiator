@@ -46,8 +46,7 @@ impl PlayerGame {
                     // guarantee that there are legal moves 
                     if legal_moves.is_empty() {
                         let msg = format!(
-                            "Despite the game not being over, the bot returned None for a move. 
-                            Game FEN {}. There are no legal moves",
+                            "Despite the game not being over There are no legal moves. FEN {}",
                             self.game.fen()
                         );
                         error!("{}", msg);
