@@ -22,8 +22,10 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::chess_engine;
 use crate::websocket::MyWebSocket;
 use crate::{chess_engine::engine_vs_engine, chess_game::ChessGame};
+use crate::player_vs_bot::PlayerGame;
 
 pub type GameMap = DashMap<Uuid, Arc<RwLock<ChessGame>>>;
 pub type Connection = Addr<MyWebSocket>;
@@ -43,6 +45,7 @@ async fn ping() -> impl Responder {
 async fn new_game(
     app_data: web::Data<GameMap>,
     active_processes: web::Data<Arc<Mutex<HashMap<Uuid, JoinSet<()>>>>>,
+    active_player_games: web::Data<DashMap<Uuid, PlayerGame>>,
     connections: web::Data<DashMap<Uuid, SharedState>>,
     req_body: Json<NewGameArgs>,
 ) -> impl Responder {
@@ -53,8 +56,11 @@ async fn new_game(
 
     match req_body.mode.as_str() {
         "playerVsBot" => {
-            let game = Arc::new(RwLock::new(ChessGame::new()));
-            app_data.insert(new_game_id, game);
+            // TODO: allow bot id in request body to select bot to play here
+            let bot = chess_engine::RandomEngine::new();
+            let game = PlayerGame::new(bot);
+            log::info!("Starting Player vs Bot Game: {new_game_id}");
+            active_player_games.insert(new_game_id, game);
         }
         "botVsBot" => {
             let game = Arc::new(RwLock::new(ChessGame::new()));
@@ -178,6 +184,8 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     ));
     let active_tasks = web::Data::new(active);
 
+    let player_bot_games = web::Data::new(DashMap::<Uuid, PlayerGame>::new());
+
     // Initialize an empty hashmap which maps UUID to ChessGame 
     let games: GameMap = DashMap::new();
     let games_data = web::Data::new(games);
@@ -214,6 +222,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .app_data(handlebars_ref.clone())
             .app_data(active_tasks.clone())
             .app_data(connections_data.clone())
+            .app_data(player_bot_games.clone())
             .route("/ws/{uuid}", web::get().to(ws_index))
             .service(spectate_game)
             .service(new_game)
