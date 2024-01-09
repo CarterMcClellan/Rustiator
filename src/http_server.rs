@@ -214,6 +214,8 @@ pub async fn player_vs_bot(
         )));
     };
 
+    log::debug!("Player Trying to play: {}", req_body.player_move);
+
     let player_move = req_body
         .player_move
         .to_move(&game.game.game /*lmao*/)
