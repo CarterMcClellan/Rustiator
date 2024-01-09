@@ -26,6 +26,8 @@ async fn main() -> Result<()> {
             .default_value("8080"))
         .get_matches();
 
+    init_logger();
+
     let hostname = matches.value_of("hostname").unwrap().to_string();
     let port = matches.value_of("port").unwrap().parse::<u16>().expect("Invalid port number");
 
@@ -36,9 +38,13 @@ async fn main() -> Result<()> {
 
     // Handle the result of the HTTP server future
     if let Err(e) = server_result {
-        eprintln!("Server encountered an error: {}", e);
+        log::error!("Server encountered an error: {}", e);
         // Handle the error (e.g., retry, exit, etc.)
     }
 
     Ok(())
+}
+
+fn init_logger() {
+    env_logger::builder().filter_level(log::LevelFilter::Debug).init()
 }

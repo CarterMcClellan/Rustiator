@@ -5,6 +5,8 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
+use log::{info, error};
+
 use crate::chess_game::ChessGame;
 use crate::websocket::Notification;
 
@@ -21,7 +23,7 @@ impl RandomEngine {
 }
 
 impl ChooseMove for RandomEngine {
-    fn choose_move(&self, chess_game: &str, legal_moves: &MoveList) -> Option<Move> {
+    fn choose_move(&self, _chess_game: &str, legal_moves: &MoveList) -> Option<Move> {
         if legal_moves.is_empty() {
             None
         } else {
@@ -39,7 +41,7 @@ pub fn engine_vs_engine<T: ChooseMove>(
     engine2: Arc<T>,
     sender_channel: Sender<Notification>
 ) {
-    println!("Engine vs Engine Started...");
+    info!("Engine vs Engine Started...");
     let mut moves_without_capture = 0;
 
     loop {
@@ -59,7 +61,7 @@ pub fn engine_vs_engine<T: ChooseMove>(
                 game.make_move(m);
                 send_notification(&sender_channel, game.fen());
             } else {
-                println!("Game over, other engine wins or stalemate");
+                info!("Game over, other engine wins or stalemate");
                 return;
             }
 
@@ -75,7 +77,7 @@ fn game_ended(game: &ChessGame, moves_without_capture: usize) -> bool {
        game.game.is_insufficient_material() || game.game.outcome().is_some() ||
        moves_without_capture >= 50 
     {
-        println!("Game over, endgame condition reached");
+        info!("Game over, endgame condition reached");
         true
     } else {
         false
@@ -93,6 +95,6 @@ fn update_moves_counter(counter: &mut usize, is_capture: bool) {
 fn send_notification(sender: &Sender<Notification>, fen: String) {
     match sender.send(Notification(fen)) {
         Ok(_) => {},
-        Err(e) => eprintln!("Error sending notification: {}", e),
+        Err(e) => error!("Error sending notification: {}", e),
     }
 }

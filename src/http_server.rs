@@ -14,6 +14,8 @@ use actix_web::{
     get, http, post, web, web::Json, App, HttpRequest, HttpResponse, HttpServer, Responder,
 };
 
+use log::{info, error};
+
 use dashmap::DashMap;
 use handlebars::Handlebars;
 use serde::Deserialize;
@@ -45,7 +47,7 @@ async fn new_game(
     req_body: Json<NewGameArgs>,
 ) -> impl Responder {
 
-    println!("recieved request!");
+    info!("recieved request!");
     // Generate a new UUID
     let new_game_id = Uuid::new_v4();
 
@@ -78,7 +80,7 @@ async fn new_game(
                     let result = match rx.recv() {
                         Ok(message) => message,
                         Err(e) => {
-                            eprintln!("Game over, terminating the thread: {:?}", e);
+                            error!("Game over, terminating the thread: {:?}", e);
                             break; // Exit the loop and end the thread
                         }
                     };
@@ -95,7 +97,7 @@ async fn new_game(
             let mut active_tasks = active_processes.lock().unwrap();
             active_tasks.insert(new_game_id, game_join_set);
 
-            println!("inserted game {} into active tasks", new_game_id);
+            info!("inserted game {} into active tasks", new_game_id);
             app_data.insert(new_game_id, game);
         }
         _ => {
@@ -104,7 +106,7 @@ async fn new_game(
     }
 
     // Return the new game ID to the client
-    println!("reached return ");
+    info!("reached return ");
     HttpResponse::Ok().json(serde_json::json!({ "game_id": new_game_id.to_string() }))
 }
 
@@ -142,7 +144,7 @@ async fn spectate_game(
 
     // Render the template with the data
     let body = hb.render("spectate_template", &data).unwrap_or_else(|err| {
-        println!("Template rendering error: {}", err);
+        error!("Template rendering error: {}", err);
         "Template rendering error".to_string()
     });
 
@@ -155,7 +157,7 @@ pub async fn ws_index(
     uuid: web::Path<Uuid>, // Extract UUID from the path
     connections: web::Data<DashMap<Uuid, SharedState>>
 ) -> Result<HttpResponse, Error> {
-    println!("New Connection to Game: {}", &uuid);
+    info!("New Connection to Game: {}", &uuid);
     match connections.get(&uuid) {
         Some(game_conns) => {
             let game_conns: SharedState = game_conns.clone();
@@ -190,7 +192,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     let connections: DashMap<Uuid, SharedState> = DashMap::new();
     let connections_data = web::Data::new(connections);
 
-    println!("Starting server on {}:{}", hostname, port);
+    info!("Starting server on {}:{}", hostname, port);
     let allowed_origin = format!("http://{}:{}", &hostname, &port);
     HttpServer::new(move || {
         let mut cors = Cors::default()
