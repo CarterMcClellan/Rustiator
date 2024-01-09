@@ -33,7 +33,7 @@ impl Actor for MyWebSocket {
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         // process websocket messages
-        println!("WS: {msg:?}");
+        log::debug!("WS: {msg:?}");
         match msg {
             Ok(ws::Message::Ping(msg)) => {
                 ctx.pong(&msg);
