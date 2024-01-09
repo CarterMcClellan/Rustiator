@@ -3,9 +3,11 @@
 // the game state
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use shakmaty::{Chess, Move, MoveList, Position, Role, Square};
+use log::{info, error};
 
 pub struct ChessGame {
     pub game: Chess,
+    pub moves_without_capture: u32
 }
 
 // Serde calls this the definition of the remote type. It is just a copy of the
@@ -215,11 +217,18 @@ impl ChessGame {
     pub fn new() -> Self {
         ChessGame {
             game: Chess::default(),
+            moves_without_capture: 0
         }
     }
 
     // Makes a move, if it is legal
     pub fn make_move(&mut self, m: &Move) {
+        if m.is_capture() {
+            self.moves_without_capture = 0;
+        } else {
+            self.moves_without_capture += 1;
+        }
+
         self.game.play_unchecked(m);
     }
 
@@ -239,5 +248,17 @@ impl ChessGame {
             .iter()
             .map(|m| m.to_string())
             .collect()
+    }
+
+    pub fn game_over(&self) -> bool {
+        if self.game.is_checkmate() || self.game.is_stalemate() || 
+            self.game.is_insufficient_material() || self.game.outcome().is_some() ||
+            self.moves_without_capture >= 50
+        {
+            info!("Game over, endgame condition reached");
+            true
+        } else {
+            false
+        }
     }
 }

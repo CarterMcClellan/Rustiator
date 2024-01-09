@@ -42,13 +42,12 @@ pub fn engine_vs_engine<T: ChooseMove>(
     sender_channel: Sender<Notification>
 ) {
     info!("Engine vs Engine Started...");
-    let mut moves_without_capture = 0;
 
     loop {
         let mut game = game.write().unwrap(); // Lock the game for the current scope
 
         // Check for game end conditions
-        if game_ended(&game, moves_without_capture) {
+        if game.game_over() {
             break;
         }
 
@@ -57,7 +56,6 @@ pub fn engine_vs_engine<T: ChooseMove>(
             let (legal_moves, fen) = (game.get_legal_moves(), game.fen());
 
             if let Some(m) = engine.choose_move(&fen, &legal_moves) {
-                update_moves_counter(&mut moves_without_capture, m.is_capture());
                 game.make_move(&m);
                 send_notification(&sender_channel, game.fen());
             } else {
@@ -65,30 +63,10 @@ pub fn engine_vs_engine<T: ChooseMove>(
                 return;
             }
 
-            if game_ended(&game, moves_without_capture) {
+            if game.game_over() {
                 return;
             }
         }
-    }
-}
-
-fn game_ended(game: &ChessGame, moves_without_capture: usize) -> bool {
-    if game.game.is_checkmate() || game.game.is_stalemate() || 
-       game.game.is_insufficient_material() || game.game.outcome().is_some() ||
-       moves_without_capture >= 50 
-    {
-        info!("Game over, endgame condition reached");
-        true
-    } else {
-        false
-    }
-}
-
-fn update_moves_counter(counter: &mut usize, is_capture: bool) {
-    if is_capture {
-        *counter = 0;
-    } else {
-        *counter += 1;
     }
 }
 
