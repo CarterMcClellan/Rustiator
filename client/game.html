@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess</title>
+    <style>
+        {{{style}}}
+    </style>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #board1 {
+            width: 400px;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+</head>
+<body>
+    <div id="board1"></div>
+    <script>
+        {{{board_js}}}
+    </script>
+    <script>
+        var board = null;
+        var gameId = "{{game_id}}";
+        var position = "{{position}}";
+
+        // If we return false from this function. The piece will not move.
+        function onDragStart(
+            source,
+            piece,
+            currentPosition,
+            currentOrientation
+        ) {
+            // block moving black
+            if (piece[0] === "b") {
+                return false;
+            }
+        }
+
+        // Called when you let go of the piece
+        async function onDrop(
+          draggedPieceSource,
+          draggedPieceDest,
+          draggedPiece,
+          newPosition,
+          oldPosition,
+          currentOrientation
+        ) {
+            // This is most definitely incomplete
+            var uci = draggedPieceSource + draggedPieceDest;
+
+            // hack for auto queen promotion. We need to build an actual interface for this
+            if (draggedPiece[1] == "P" && draggedPieceDest[1] == "8") {
+                uci += "q";
+            }
+
+            var newState = await sendMove(uci) || oldPosition;
+            board.position(newState);
+        }
+
+
+        // returns new board state if it was a valid move
+        async function sendMove(uci) {
+            var response = await fetch(`/play/${gameId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    move: uci,
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const state = data.board_state;
+                return state;
+            } else {
+                console.error('Error Sending Request:', response.statusText);
+            }
+        }
+
+        var config = {
+            draggable: true,
+            position: position,
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+        }
+
+
+        board = Chessboard('board1', config);
+
+    </script>
+</body>
+</html>

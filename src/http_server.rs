@@ -202,6 +202,7 @@ struct PlayGameResponse {
 }
 
 #[post("/play/{uuid}")]
+/// Play a given move against a bot
 pub async fn player_vs_bot(
     active_player_games: web::Data<DashMap<Uuid, PlayerGame>>,
     req_body: Json<PlayGameArgs>,
@@ -230,6 +231,41 @@ pub async fn player_vs_bot(
     }))
 }
 
+
+
+#[get("/game/{uuid}")]
+async fn play_game_entry(
+    active_player_games: web::Data<DashMap<Uuid, PlayerGame>>,
+    hb: web::Data<Handlebars<'_>>,
+    uuid: web::Path<Uuid>,
+) -> impl Responder {
+    let Some(game) = active_player_games.get(&uuid) else {
+        return Err(actix_web::error::ErrorBadRequest(format!(
+            "No active game for {uuid}"
+        )));
+    };
+
+    let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
+    let js_content = std::fs::read_to_string("./client/js/chessboard-1.0.0.js").unwrap();
+
+    // Create data to fill the template
+    let data = json!({
+        "game_id": uuid.to_string(),
+        "position": game.fen(),
+        "style": css_content,
+        "board_js":js_content
+    });
+
+    // Render the template with the data
+    let body = hb.render("game_template", &data).unwrap_or_else(|err| {
+        error!("Template rendering error: {}", err);
+        "Template rendering error".to_string()
+    });
+
+    Ok(HttpResponse::Ok().content_type("text/html").body(body))
+}
+
+
 pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     // Init an empty hashmap to store all the ongoing processes
     let active = Arc::new(Mutex::new(
@@ -247,6 +283,9 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     handlebars
         .register_template_file("spectate_template", "./client/spectate.html")
         .unwrap(); // lol fix
+    handlebars
+        .register_template_file("game_template", "./client/game.html")
+        .unwrap(); // lmao fix
     let handlebars_ref = web::Data::new(handlebars);
 
     // Active Spectator connections 
@@ -280,6 +319,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .service(spectate_game)
             .service(new_game)
             .service(player_vs_bot)
+            .service(play_game_entry)
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
             .service(fs::Files::new("/img", "./client/img"))
 
