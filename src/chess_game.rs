@@ -1,13 +1,13 @@
 // 99% of the code in this file is just serialization/deserialization code
 // the only interesting bit is the logic at the botton for actually maintaining
 // the game state
+use log::{error, info};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use shakmaty::{Chess, Move, MoveList, Position, Role, Square};
-use log::{info, error};
 
 pub struct ChessGame {
     pub game: Chess,
-    pub moves_without_capture: u32
+    pub moves_without_capture: u32,
 }
 
 // Serde calls this the definition of the remote type. It is just a copy of the
@@ -217,7 +217,7 @@ impl ChessGame {
     pub fn new() -> Self {
         ChessGame {
             game: Chess::default(),
-            moves_without_capture: 0
+            moves_without_capture: 0,
         }
     }
 
@@ -251,9 +251,11 @@ impl ChessGame {
     }
 
     pub fn game_over(&self) -> bool {
-        if self.game.is_checkmate() || self.game.is_stalemate() || 
-            self.game.is_insufficient_material() || self.game.outcome().is_some() ||
-            self.moves_without_capture >= 50
+        if self.game.is_checkmate()
+            || self.game.is_stalemate()
+            || self.game.is_insufficient_material()
+            || self.game.outcome().is_some()
+            || self.moves_without_capture >= 50
         {
             info!("Game over, endgame condition reached");
             true

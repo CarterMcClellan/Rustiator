@@ -8,3 +8,6 @@ task:
 
   test_script:
     - cargo test
+
+  check_format_for_script:
+    - cargo fmt --check

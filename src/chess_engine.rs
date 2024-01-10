@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
-use log::{info, error};
+use log::{error, info};
 
 use crate::chess_game::ChessGame;
 use crate::websocket::Notification;
@@ -39,7 +39,7 @@ pub fn engine_vs_engine<T: ChooseMove>(
     game: Arc<RwLock<ChessGame>>,
     engine1: Arc<T>,
     engine2: Arc<T>,
-    sender_channel: Sender<Notification>
+    sender_channel: Sender<Notification>,
 ) {
     info!("Engine vs Engine Started...");
 
@@ -72,7 +72,7 @@ pub fn engine_vs_engine<T: ChooseMove>(
 
 fn send_notification(sender: &Sender<Notification>, fen: String) {
     match sender.send(Notification(fen)) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => error!("Error sending notification: {}", e),
     }
 }

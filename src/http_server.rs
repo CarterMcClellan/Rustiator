@@ -10,11 +10,11 @@ use tokio::task::JoinSet;
 use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{
-    get, http, post, web, web::Json, App, HttpRequest, HttpResponse, HttpServer, Responder,
-    Error, middleware,
+    get, http, middleware, post, web, web::Json, App, Error, HttpRequest, HttpResponse, HttpServer,
+    Responder,
 };
 
-use log::{info, error};
+use log::{error, info};
 
 use dashmap::DashMap;
 use handlebars::Handlebars;
@@ -25,9 +25,9 @@ use uuid::Uuid;
 use shakmaty::uci::Uci;
 
 use crate::chess_engine;
+use crate::player_vs_bot::PlayerGame;
 use crate::websocket::MyWebSocket;
 use crate::{chess_engine::engine_vs_engine, chess_game::ChessGame};
-use crate::player_vs_bot::PlayerGame;
 
 pub type GameMap = DashMap<Uuid, Arc<RwLock<ChessGame>>>;
 pub type Connection = Addr<MyWebSocket>;
@@ -51,7 +51,6 @@ async fn new_game(
     connections: web::Data<DashMap<Uuid, SharedState>>,
     req_body: Json<NewGameArgs>,
 ) -> impl Responder {
-
     info!("recieved request!");
     // Generate a new UUID
     let new_game_id = Uuid::new_v4();
@@ -92,10 +91,10 @@ async fn new_game(
                             break; // Exit the loop and end the thread
                         }
                     };
-            
+
                     let connections_clone = new_game_connections.read().unwrap();
                     for conn in connections_clone.iter() {
-                        conn.do_send(result.clone()); 
+                        conn.do_send(result.clone());
                     }
                 }
             });
@@ -138,8 +137,7 @@ async fn spectate_game(
     };
 
     let position = gd_lock.fen();
-    let css_content =
-        std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
+    let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
     let js_content = std::fs::read_to_string("./client/js/chessboard-1.0.0.js").unwrap();
 
     // Create data to fill the template
@@ -163,7 +161,7 @@ pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     uuid: web::Path<Uuid>, // Extract UUID from the path
-    connections: web::Data<DashMap<Uuid, SharedState>>
+    connections: web::Data<DashMap<Uuid, SharedState>>,
 ) -> Result<HttpResponse, Error> {
     info!("New Connection to Game: {}", &uuid);
     match connections.get(&uuid) {
@@ -227,7 +225,7 @@ pub async fn player_vs_bot(
         })?;
 
     match game.play_move(player_move) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             error!("Error playing move: {}", e);
             return Err(actix_web::error::ErrorBadRequest(format!(
@@ -241,8 +239,6 @@ pub async fn player_vs_bot(
         board_state: game.fen(),
     }))
 }
-
-
 
 #[get("/game/{uuid}")]
 async fn play_game_entry(
@@ -276,17 +272,14 @@ async fn play_game_entry(
     Ok(HttpResponse::Ok().content_type("text/html").body(body))
 }
 
-
 pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     // Init an empty hashmap to store all the ongoing processes
-    let active = Arc::new(Mutex::new(
-        HashMap::<Uuid, JoinSet<()>>::new(),
-    ));
+    let active = Arc::new(Mutex::new(HashMap::<Uuid, JoinSet<()>>::new()));
     let active_tasks = web::Data::new(active);
 
     let player_bot_games = web::Data::new(DashMap::<Uuid, PlayerGame>::new());
 
-    // Initialize an empty hashmap which maps UUID to ChessGame 
+    // Initialize an empty hashmap which maps UUID to ChessGame
     let games: GameMap = DashMap::new();
     let games_data = web::Data::new(games);
 
@@ -299,7 +292,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
         .unwrap(); // lmao fix
     let handlebars_ref = web::Data::new(handlebars);
 
-    // Active Spectator connections 
+    // Active Spectator connections
     let connections: DashMap<Uuid, SharedState> = DashMap::new();
     let connections_data = web::Data::new(connections);
 
@@ -335,10 +328,12 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             // .service(fs::Files::new("/img", "./client/img"))
             .service(
                 web::scope("/img")
-                    .wrap(middleware::DefaultHeaders::new().header("Cache-Control", "public, max-age=86400"))
-                    .service(fs::Files::new("", "./client/img").use_last_modified(true))
+                    .wrap(
+                        middleware::DefaultHeaders::new()
+                            .header("Cache-Control", "public, max-age=86400"),
+                    )
+                    .service(fs::Files::new("", "./client/img").use_last_modified(true)),
             )
-
     })
     .workers(4) // Set the number of worker threads
     .bind(("0.0.0.0", port))?
