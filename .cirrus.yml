@@ -7,7 +7,8 @@ task:
     - cargo build --release
 
   test_script:
-    - cargo test
+    - cargo test --release
 
-  check_format_for_script:
+  check_format_script:
+    - rustup component add rustfmt
     - cargo fmt --check
