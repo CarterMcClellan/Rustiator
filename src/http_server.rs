@@ -236,10 +236,6 @@ pub async fn player_vs_bot(
     }
 
     Ok(Json(PlayGameResponse {
-
-
-
-        
         board_state: game.fen(),
     }))
 }
