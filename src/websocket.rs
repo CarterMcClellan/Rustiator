@@ -1,5 +1,5 @@
-use actix_web_actors::ws;
 use actix::prelude::*;
+use actix_web_actors::ws;
 
 use crate::http_server::SharedState;
 
@@ -9,9 +9,7 @@ pub struct MyWebSocket {
 
 impl MyWebSocket {
     pub fn new(connections: SharedState) -> Self {
-        Self {
-            connections
-        }
+        Self { connections }
     }
 
     fn send_message(&self, ctx: &mut <Self as Actor>::Context, message: &str) {
@@ -38,8 +36,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
             Ok(ws::Message::Ping(msg)) => {
                 ctx.pong(&msg);
             }
-            Ok(ws::Message::Pong(_)) => {
-            }
+            Ok(ws::Message::Pong(_)) => {}
             Ok(ws::Message::Text(text)) => ctx.text(text),
             Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
             Ok(ws::Message::Close(reason)) => {

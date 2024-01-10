@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Arg, Command}; // Note: It's `Command` in clap 3.x, not `App`
-use tokio;
-use server::http_server;
 use server::browser::open_browser;
+use server::http_server;
+use tokio;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -10,26 +10,34 @@ async fn main() -> Result<()> {
         .version("1.0")
         .author("Carter McClellan")
         .about("Starts a Rustiator server")
-        .arg(Arg::new("hostname")
-            .short('h')
-            .long("hostname")
-            .value_name("HOSTNAME")
-            .help("Sets the hostname")
-            .takes_value(true)
-            .default_value("localhost"))
-        .arg(Arg::new("port")
-            .short('p')
-            .long("port")
-            .value_name("PORT")
-            .help("Sets the port")
-            .takes_value(true)
-            .default_value("8080"))
+        .arg(
+            Arg::new("hostname")
+                .short('h')
+                .long("hostname")
+                .value_name("HOSTNAME")
+                .help("Sets the hostname")
+                .takes_value(true)
+                .default_value("localhost"),
+        )
+        .arg(
+            Arg::new("port")
+                .short('p')
+                .long("port")
+                .value_name("PORT")
+                .help("Sets the port")
+                .takes_value(true)
+                .default_value("8080"),
+        )
         .get_matches();
 
     init_logger();
 
     let hostname = matches.value_of("hostname").unwrap().to_string();
-    let port = matches.value_of("port").unwrap().parse::<u16>().expect("Invalid port number");
+    let port = matches
+        .value_of("port")
+        .unwrap()
+        .parse::<u16>()
+        .expect("Invalid port number");
 
     let server_future = http_server::start_server(hostname.clone(), port.clone());
     let open_browser_future = open_browser(format!("http://{}:{}", hostname, port));
@@ -46,5 +54,7 @@ async fn main() -> Result<()> {
 }
 
 fn init_logger() {
-    env_logger::builder().filter_level(log::LevelFilter::Debug).init()
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Debug)
+        .init()
 }
