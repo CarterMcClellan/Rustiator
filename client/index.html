@@ -19,6 +19,7 @@
 <body>
     <div id="setup">
         <button id="botVsBotWhite">Bot Plays Bot</button>
+        <button id="playerVsBotWhite">Play Against Bot</button>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -27,6 +28,13 @@
             $("#botVsBotWhite").click(function(event) {
                 event.preventDefault();
                 startGame('botVsBot');
+            });
+        });
+
+        $(document).ready(function() {
+            $("#playerVsBotWhite").click(function(event) {
+                event.preventDefault();
+                startGame('playerVsBot');
             });
         });
 
@@ -51,7 +59,7 @@
                 const game_id = data.game_id;
 
                 if (mode === 'playerVsBot') {
-                    window.location.href = `/${game_id}`;
+                    window.location.href = `/game/${game_id}`;
                 } else if (mode === 'botVsBot') {
                     console.log(`/spectate/${game_id}`);
                     window.location.href = `/spectate/${game_id}`;
