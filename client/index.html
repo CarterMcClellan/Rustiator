@@ -20,6 +20,7 @@
     <div id="setup">
         <button id="botVsBotWhite">Bot Plays Bot</button>
         <button id="playerVsBotWhite">Play Against Bot</button>
+        <button id="createBot">Make New Bot</button>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -35,6 +36,12 @@
             $("#playerVsBotWhite").click(function(event) {
                 event.preventDefault();
                 startGame('playerVsBot');
+            });
+        });
+
+        $(document).ready(function() {
+            $("#createBot").click(function(event) {
+                window.location.href  = "/text_editor.html";
             });
         });
 
