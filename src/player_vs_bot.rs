@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::{error, info};
+use log::error;
 use shakmaty::Move;
 
 use crate::{chess_engine::ChooseMove, chess_game::ChessGame};
@@ -30,8 +30,7 @@ impl PlayerGame {
             return Ok(None);
         }
 
-        // FIXME: remove unwrap. What does `None` mean for a choose move? it ran out of time?
-        let bot_move = match self.bot.choose_move(&self.game.fen(), &legal_moves) {
+        let bot_move = match self.bot.choose_move(&self.game.fen(), legal_moves) {
             Some(m) => m,
             None => {
                 // not really sure what we are supposed to do here

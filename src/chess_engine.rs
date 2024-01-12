@@ -1,5 +1,5 @@
 use rand::Rng;
-use shakmaty::{Move, MoveList, Position};
+use shakmaty::{Move, MoveList};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
 use std::thread;
@@ -12,6 +12,18 @@ use crate::websocket::Notification;
 
 pub trait ChooseMove {
     fn choose_move(&self, fen: &str, legal_moves: &MoveList) -> Option<Move>;
+}
+
+pub trait IntoChooseMove {
+    type Bot: ChooseMove;
+    fn into_choose_move(self) -> Self::Bot;
+}
+
+impl<C: ChooseMove> IntoChooseMove for C {
+    type Bot = C;
+    fn into_choose_move(self) -> Self::Bot {
+        self
+    }
 }
 
 pub struct RandomEngine {}

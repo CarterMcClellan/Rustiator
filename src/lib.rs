@@ -5,3 +5,4 @@ pub mod http_server;
 pub mod player_vs_bot;
 pub mod types;
 pub mod websocket;
+pub mod lua;

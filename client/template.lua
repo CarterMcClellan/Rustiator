@@ -10,5 +10,5 @@ function MyRandomBot:chooseMove(chess_game, legal_moves)
     return legal_moves[ math.random( #legal_moves ) ]
 end
 
----Return must return your bot from the script
+---Must return your bot from the script
 return MyRandomBot
