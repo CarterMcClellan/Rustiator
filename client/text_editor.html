@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #board1 {
+            width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs/loader.min.js"></script>
+    <div id="container" style="width:800px; height:600px;"></div>
+    <button id="submitBot">Submit Bot</button>
+    <script>
+
+        window.onload = async function() {
+            // Require function to initialize Monaco
+            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs' }});
+            require(["vs/editor/editor.main"], async function() {
+                monaco.editor.create(document.getElementById('container'), {
+                    value: await fetch('/template.lua').then(response => response.text()),
+                    language: 'lua',
+                    theme: 'vs-dark',
+                });
+            });
+        };
+    </script>
+</body>
+</html>
