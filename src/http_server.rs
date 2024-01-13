@@ -36,6 +36,7 @@ pub type SharedState = Arc<RwLock<Vec<Connection>>>;
 // instructions to create a new bot. We need to distinguish between a serialized bot and
 // and a deserialized bot. In case the bots are stateful
 pub type SavedBots = DashMap<String, Box<dyn ToChooseMove + Send + Sync>>;
+pub type SavedLuaBots = DashMap<String, StatelessLuaBot>;
 
 #[derive(Deserialize, Debug)]
 struct NewGameArgs {
@@ -304,9 +305,51 @@ async fn new_bot(
     // TODO: for now this will overwrite other saved bots of the same name.
     // I think this is what we want for now. But later we will need to block this and
     // then add an ability to edit already saved bots
-    app_data.saved_bots.insert(request.bot_name, Box::new(bot));
+    app_data
+        .saved_bots
+        .insert(request.bot_name.clone(), Box::new(bot.clone()));
+    app_data.saved_lua_bots.insert(request.bot_name, bot);
 
     Ok(Json(NewBotResponse {}))
+}
+
+// #[get("/editBot/{bot_name}")]
+async fn edit_bot(
+    request: actix_web::HttpRequest,
+    hb: web::Data<Handlebars<'_>>,
+) -> impl Responder {
+    // This will be "" in the case where they are making a new bot
+    let bot_name = request.match_info().query("bot_name");
+    // Create data to fill the template
+    let data = json!({
+        "bot_name": bot_name,
+    });
+
+    // Render the template with the data
+    let body = hb.render("editor_template", &data).unwrap_or_else(|err| {
+        error!("Template rendering error: {}", err);
+        "Template rendering error".to_string()
+    });
+
+    HttpResponse::Ok().content_type("text/html").body(body)
+}
+
+#[get("script/{bot_name}")]
+async fn get_script(
+    bot_name: web::Path<String>,
+    app_data: web::Data<GlobalAppData>,
+) -> impl Responder {
+    let script = app_data
+        .saved_lua_bots
+        .get(&bot_name.to_string())
+        .map(|bot| bot.script.clone())
+        .unwrap_or_else(|| {
+            log::warn!(
+                r#"Tried to get script for nonexistant bot "{bot_name}" defaulting to template"#
+            );
+            include_str!("../client/template.lua").to_string()
+        });
+    script
 }
 
 pub struct GlobalAppData {
@@ -315,6 +358,7 @@ pub struct GlobalAppData {
     connections: DashMap<Uuid, SharedState>,
     active_bot_bot_games: GameMap,
     saved_bots: SavedBots,
+    saved_lua_bots: SavedLuaBots,
 }
 
 pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
@@ -333,6 +377,9 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     handlebars
         .register_template_file("game_template", "./client/game.html")
         .unwrap(); // lmao fix
+    handlebars
+        .register_template_file("editor_template", "./client/text_editor.html")
+        .unwrap(); // lol don't fix?
     let handlebars_ref = web::Data::new(handlebars);
 
     // Active Spectator connections
@@ -341,12 +388,15 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     let saved_bots: SavedBots = DashMap::new();
     saved_bots.insert(String::from("RustRandomBot"), Box::new(RandomEngine::new()));
 
+    let saved_lua_bots = DashMap::new();
+
     let app_data = web::Data::new(GlobalAppData {
         connections,
         active_processes,
         active_bot_bot_games,
         active_player_games,
         saved_bots,
+        saved_lua_bots,
     });
 
     info!("Starting server on {}:{}", hostname, port);
@@ -375,6 +425,8 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .service(player_vs_bot)
             .service(play_game_entry)
             .service(new_bot)
+            .service(get_script)
+            .service(web::resource(["/editBot", "/editBot/{bot_name}"]).to(edit_bot))
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
             // .service(fs::Files::new("/img", "./client/img"))
             .service(

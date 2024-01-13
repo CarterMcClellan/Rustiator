@@ -12,7 +12,7 @@ use crate::{chess_engine::ChooseMove, chess_game::ChessGame};
 /// This means that any state in the bot will not be preserved on successive calls to choose_move
 #[derive(Clone)]
 pub struct StatelessLuaBot {
-    script: String,
+    pub script: String,
 }
 
 impl StatelessLuaBot {

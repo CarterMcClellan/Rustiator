@@ -24,18 +24,19 @@
     <div id="container" style="width:800px; height:600px;"></div>
     <form id="submitBot">
         <label for="wordInput">Bot Name:</label>
-        <input type="text" id="nameInput" name="nameInput">
+        <input type="text" id="nameInput" name="nameInput" value="{{bot_name}}">
         <input type="submit" value="Submit">
     </form>
     <script>
         var editor;
+        var botName = "{{bot_name}}";
 
         window.onload = async function () {
             // Require function to initialize Monaco
             require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs' } });
             require(["vs/editor/editor.main"], async function () {
                 editor = monaco.editor.create(document.getElementById('container'), {
-                    value: await fetch('/template.lua').then(response => response.text()),
+                    value: await (botName == "" ? fetch("/template.lua") : fetch(`/script/${botName}`)).then(response => response.text()),
                     language: 'lua',
                     theme: 'vs-dark',
                 });
