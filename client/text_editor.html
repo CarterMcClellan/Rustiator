@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Chess</title>
     <style>
@@ -11,28 +12,96 @@
             height: 100vh;
             margin: 0;
         }
+
         #board1 {
             width: 400px;
         }
     </style>
 </head>
+
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs/loader.min.js"></script>
     <div id="container" style="width:800px; height:600px;"></div>
-    <button id="submitBot">Submit Bot</button>
+    <form id="submitBot">
+        <label for="wordInput">Bot Name:</label>
+        <input type="text" id="nameInput" name="nameInput">
+        <input type="submit" value="Submit">
+    </form>
     <script>
+        var editor;
 
-        window.onload = async function() {
+        window.onload = async function () {
             // Require function to initialize Monaco
-            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs' }});
-            require(["vs/editor/editor.main"], async function() {
-                monaco.editor.create(document.getElementById('container'), {
+            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs' } });
+            require(["vs/editor/editor.main"], async function () {
+                editor = monaco.editor.create(document.getElementById('container'), {
                     value: await fetch('/template.lua').then(response => response.text()),
                     language: 'lua',
                     theme: 'vs-dark',
                 });
             });
         };
+
+
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById("submitBot").addEventListener("submit", async function (event) {
+                event.preventDefault();
+
+                const botName = document.getElementById("nameInput").value;
+                const script = editor.getValue();
+
+                let response = await fetch("/newBot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ botName, script }),
+                });
+
+                if (!response.ok) {
+                    console.error('Error Sending Request:', response.statusText);
+                    console.error('Full Response', response);
+                    return;
+                }
+
+                startGame('playerVsBot', botName);
+            });
+
+        });
+
+        // lifted this straight from index.html. What is the best way for these html files to share code?
+        // do we just write these in .js files and include them with <script> tags?
+        async function startGame(mode, botName) {
+            var body = {
+                mode,
+                botName
+            };
+            console.log("input", JSON.stringify(body));
+            var response = await fetch('/new_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            console.log("received response");
+
+            if (response.ok) {
+                const data = await response.json();
+                const game_id = data.game_id;
+
+                if (mode === 'playerVsBot') {
+                    window.location.href = `/game/${game_id}`;
+                } else if (mode === 'botVsBot') {
+                    console.log(`/spectate/${game_id}`);
+                    window.location.href = `/spectate/${game_id}`;
+                }
+            } else {
+                console.error('Failed to fetch:', response.statusText);
+            }
+        }
     </script>
 </body>
+
 </html>

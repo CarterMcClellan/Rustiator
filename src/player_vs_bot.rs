@@ -1,19 +1,20 @@
 use anyhow::Result;
-use log::error;
 use shakmaty::Move;
 
 use crate::{chess_engine::ChooseMove, chess_game::ChessGame};
 
 pub struct PlayerGame {
-    bot: Box<dyn ChooseMove + Send + Sync>,
+    bot: Box<dyn ChooseMove>,
     pub game: ChessGame,
+    pub bot_name: String,
 }
 
 impl PlayerGame {
-    pub fn new<C: 'static + ChooseMove + Send + Sync>(bot: C) -> Self {
+    pub fn new<C: 'static + ChooseMove>(bot: C, name: impl ToString) -> Self {
         Self {
             bot: Box::new(bot),
             game: ChessGame::new(),
+            bot_name: name.to_string(),
         }
     }
 
@@ -30,32 +31,9 @@ impl PlayerGame {
             return Ok(None);
         }
 
-        let bot_move = match self.bot.choose_move(&self.game.fen(), legal_moves) {
-            Some(m) => m,
-            None => {
-                // not really sure what we are supposed to do here
-                // this is not a mistake by the player its a mistake by the bot
-                error!(
-                    "Despite the game not being over, 
-                        the bot returned None for a move. Game FEN {}.
-                        Defaulting to a random move",
-                    self.game.fen()
-                );
-
-                // as mentioned above, the game not being over should
-                // guarantee that there are legal moves
-                if legal_moves.is_empty() {
-                    let msg = format!(
-                        "Despite the game not being over There are no legal moves. FEN {}",
-                        self.game.fen()
-                    );
-                    error!("{}", msg);
-                    return Err(anyhow::anyhow!(msg));
-                }
-
-                legal_moves[0].clone()
-            }
-        };
+        // Going to propagate error here from bot. For lua bots we have to assume that
+        // bugs are common and we want to propogate them to the client so bot creators can debug
+        let bot_move = self.bot.choose_move(&self.game, legal_moves)?;
 
         self.game.make_move(&bot_move);
 

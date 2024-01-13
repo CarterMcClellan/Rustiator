@@ -35,7 +35,7 @@
         $(document).ready(function() {
             $("#playerVsBotWhite").click(function(event) {
                 event.preventDefault();
-                startGame('playerVsBot');
+                startGame('playerVsBot', 'RustRandomBot');
             });
         });
 
@@ -45,18 +45,18 @@
             });
         });
 
-        async function startGame(mode) {
-            console.log("input", JSON.stringify({
-                mode: mode,
-            }));
+        async function startGame(mode, botName) {
+            var body = {
+                mode,
+                botName
+            };
+            console.log("input", JSON.stringify(body));
             var response = await fetch('/new_game', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    mode: mode,
-                })
+                body: JSON.stringify(body)
             });
 
             console.log("received response");
