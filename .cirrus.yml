@@ -1,7 +1,7 @@
 task:
   name: Build and Test
   container:
-    image: rust:slim-bookworm
+    image: rust:bookworm
 
   build_script:
     - cargo build --release

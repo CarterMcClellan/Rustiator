@@ -1,5 +1,5 @@
 # Use a Rust image to build the application
-FROM rust:slim-bookworm as builder
+FROM rust:bookworm as builder
 
 # Copy your manifests
 COPY ./Cargo.toml ./Cargo.toml
@@ -12,6 +12,7 @@ RUN rm src/*.rs
 
 # Copy Deps
 COPY ./src ./src
+COPY ./client ./client
 RUN touch ./src/main.rs
 RUN touch ./src/lib.rs
 
@@ -19,7 +20,7 @@ RUN touch ./src/lib.rs
 RUN cargo build --release
 
 # Use a smaller image to run the application
-FROM debian:bookworm-slim
+FROM debian:bookworm
 
 # Copy the build artifact from the build stage
 COPY --from=builder /target/release/server .
