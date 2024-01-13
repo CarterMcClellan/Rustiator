@@ -33,6 +33,10 @@
         padding: 20px;
         border: 1px solid #888;
         width: 80%;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Aligns items horizontally in the center */
+        justify-content: center;
         /* Could be more or less, depending on screen size */
     }
 
@@ -83,7 +87,6 @@
 
         <!-- Modal content -->
         <div class="modal-content">
-            <span class="close">&times;</span>
             <p id="errorText"></p>
             <button onclick="location.href='/editBot/{{bot_name}}'">Edit Bot</button>
         </div>
@@ -183,13 +186,6 @@
 
             // active popup
             modal.style.display = "block";
-        }
-
-        // Get the <span> element that closes the modal
-        var span = document.getElementsByClassName("close")[0];
-        // When the user clicks on <span> (x), close the modal
-        span.onclick = function () {
-            modal.style.display = "none";
         }
 
         // When the user clicks anywhere outside of the modal, close it
