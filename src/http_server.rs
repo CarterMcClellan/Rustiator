@@ -238,7 +238,7 @@ pub async fn player_vs_bot(
         Ok(_) => {}
         Err(e) => {
             error!("Error playing move: {e:?}");
-            return Err(actix_web::error::ErrorBadRequest(format!(
+            return Err(actix_web::error::ErrorInternalServerError(format!(
                 "Error Playing Move {}: {e:?}",
                 req_body.player_move
             )));
