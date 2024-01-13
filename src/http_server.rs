@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use shakmaty::uci::Uci;
 
-use crate::chess_engine::{self, RandomEngine, ToChooseMove};
+use crate::chess_engine::{RandomEngine, ToChooseMove};
 use crate::player_vs_bot::PlayerGame;
 use crate::websocket::MyWebSocket;
 use crate::{chess_engine::engine_vs_engine, chess_game::ChessGame, lua::StatelessLuaBot};
@@ -32,9 +32,6 @@ use crate::{chess_engine::engine_vs_engine, chess_game::ChessGame, lua::Stateles
 pub type GameMap = DashMap<Uuid, Arc<RwLock<ChessGame>>>;
 pub type Connection = Addr<MyWebSocket>;
 pub type SharedState = Arc<RwLock<Vec<Connection>>>;
-// TODO: this is actually incomplete. We will need to store saved bots as more like
-// instructions to create a new bot. We need to distinguish between a serialized bot and
-// and a deserialized bot. In case the bots are stateful
 pub type SavedBots = DashMap<String, Box<dyn ToChooseMove + Send + Sync>>;
 pub type SavedLuaBots = DashMap<String, StatelessLuaBot>;
 
@@ -148,14 +145,12 @@ async fn spectate_game(
 
     let position = gd_lock.fen();
     let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
-    let js_content = std::fs::read_to_string("./client/js/chessboard-1.0.0.js").unwrap();
 
     // Create data to fill the template
     let data = json!({
         "game_id": game_uuid.to_string(),
         "position": position,
         "style": css_content,
-        "board_js":js_content
     });
 
     // Render the template with the data
@@ -263,14 +258,12 @@ async fn play_game_entry(
     };
 
     let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
-    let js_content = std::fs::read_to_string("./client/js/chessboard-1.0.0.js").unwrap();
 
     // Create data to fill the template
     let data = json!({
         "game_id": uuid.to_string(),
         "position": game.fen(),
         "style": css_content,
-        "board_js":js_content,
         "bot_name": game.bot_name,
     });
 
@@ -352,6 +345,21 @@ async fn get_script(
     script
 }
 
+#[derive(Serialize)]
+struct BotNamesResponse {
+    bot_names: Vec<String>,
+}
+
+#[get("/botNames")]
+async fn get_bots(app_data: web::Data<GlobalAppData>) -> Json<BotNamesResponse> {
+    let bot_names = app_data
+        .saved_bots
+        .iter()
+        .map(|entry| entry.key().to_string())
+        .collect();
+    Json(BotNamesResponse { bot_names })
+}
+
 pub struct GlobalAppData {
     active_processes: Arc<Mutex<HashMap<Uuid, JoinSet<()>>>>,
     active_player_games: DashMap<Uuid, PlayerGame>,
@@ -426,6 +434,7 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .service(play_game_entry)
             .service(new_bot)
             .service(get_script)
+            .service(get_bots)
             .service(web::resource(["/editBot", "/editBot/{bot_name}"]).to(edit_bot))
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
             // .service(fs::Files::new("/img", "./client/img"))

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<link rel="stylesheet" type="text/css" href="/css/botButtons.css">
+
+<head>
+    <title>Choose Which Bot To Edit</title>
+</head>
+
+<body>
+    <div id="botButtons"></div>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', fetchBots);
+
+    function fetchBots() {
+        // TODO: the endpoint also returns the rust bot so if they try to edit it they will just get the lua template
+        fetch('/botNames')
+            .then(response => response.json())
+            .then(data => {
+                createButtons(data.bot_names);
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function createButtons(bots) {
+        const container = document.getElementById('botButtons');
+        bots.forEach(botName => {
+            let button = document.createElement('button');
+            button.textContent = botName;
+            button.onclick = function () { window.location.href = `editBot/${botName}`};
+            container.appendChild(button);
+        });
+    }
+
+</script>
+
+</html>

@@ -19,62 +19,20 @@
 <body>
     <div id="setup">
         <button id="botVsBotWhite">Bot Plays Bot</button>
-        <button id="playerVsBotWhite">Play Against Bot</button>
-        <button id="createBot">Make New Bot</button>
+        <button id="playerVsBotWhite" onclick='window.location.href="/choose_bot.html"' >Play Against Bot</button>
+        <button id="createBot" onclick='window.location.href="/editBot"'>Make New Bot</button>
+        <button id="editBot" onclick='window.location.href="/choose_bot_edit.html"'>Edit a Bot</button>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/js/utils.js"></script>
     <script>
         $(document).ready(function() {
             $("#botVsBotWhite").click(function(event) {
                 event.preventDefault();
-                startGame('botVsBot');
+                startGame('botVsBot', 'RustRandomBot');
             });
         });
-
-        $(document).ready(function() {
-            $("#playerVsBotWhite").click(function(event) {
-                event.preventDefault();
-                startGame('playerVsBot', 'RustRandomBot');
-            });
-        });
-
-        $(document).ready(function() {
-            $("#createBot").click(function(event) {
-                window.location.href  = "/editBot";
-            });
-        });
-
-        async function startGame(mode, botName) {
-            var body = {
-                mode,
-                botName
-            };
-            console.log("input", JSON.stringify(body));
-            var response = await fetch('/new_game', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-
-            console.log("received response");
-
-            if (response.ok) {
-                const data = await response.json();
-                const game_id = data.game_id;
-
-                if (mode === 'playerVsBot') {
-                    window.location.href = `/game/${game_id}`;
-                } else if (mode === 'botVsBot') {
-                    console.log(`/spectate/${game_id}`);
-                    window.location.href = `/spectate/${game_id}`;
-                }
-            } else {
-                console.error('Failed to fetch:', response.statusText);
-            }
-        }
     </script>
 </body>
 </html>
