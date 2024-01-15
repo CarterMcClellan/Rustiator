@@ -15,7 +15,7 @@ use crate::websocket::Notification;
 pub trait ChooseMove: Send + Sync {
     /// Choose move has the assumption that the bot can play a move. Handing it a game with no legal moves
     /// is invalid. The user should check if the game is over before calling this
-    fn choose_move(&self, chess_game: &ChessGame, legal_moves: &MoveList) -> AnyResult<Move>; // TODO: use something other than anyhow here plz
+    fn choose_move(&self, chess_game: &ChessGame, legal_moves: &MoveList) -> AnyResult<Move>;
 }
 
 /// Allows us to distinguish between a saved bot and an active bot

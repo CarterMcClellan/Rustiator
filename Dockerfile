@@ -1,5 +1,9 @@
 # Use a Rust image to build the application
-FROM rust:bookworm as builder
+FROM rust:slim-bookworm as builder
+
+RUN apt-get update -y && \
+    apt-get install -y --fix-missing \
+    build-essential
 
 # Copy your manifests
 COPY ./Cargo.toml ./Cargo.toml
@@ -20,7 +24,7 @@ RUN touch ./src/lib.rs
 RUN cargo build --release
 
 # Use a smaller image to run the application
-FROM debian:bookworm
+FROM debian:bookworm-slim
 
 # Copy the build artifact from the build stage
 COPY --from=builder /target/release/server .

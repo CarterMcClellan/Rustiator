@@ -8,3 +8,7 @@
 button {
     margin: 10px; /* Adds spacing between buttons */
 }
+
+h2 {
+    text-align: center;
+}

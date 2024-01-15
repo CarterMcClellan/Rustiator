@@ -144,13 +144,11 @@ async fn spectate_game(
     };
 
     let position = gd_lock.fen();
-    let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
 
     // Create data to fill the template
     let data = json!({
         "game_id": game_uuid.to_string(),
         "position": position,
-        "style": css_content,
     });
 
     // Render the template with the data
@@ -257,13 +255,10 @@ async fn play_game_entry(
         )));
     };
 
-    let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
-
     // Create data to fill the template
     let data = json!({
         "game_id": uuid.to_string(),
         "position": game.fen(),
-        "style": css_content,
         "bot_name": game.bot_name,
     });
 
@@ -437,7 +432,6 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
             .service(get_bots)
             .service(web::resource(["/editBot", "/editBot/{bot_name}"]).to(edit_bot))
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
-            // .service(fs::Files::new("/img", "./client/img"))
             .service(
                 web::scope("/img")
                     .wrap(
