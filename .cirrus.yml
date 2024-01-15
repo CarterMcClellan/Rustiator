@@ -1,7 +1,11 @@
 task:
   name: Build and Test
   container:
-    image: rust:bookworm
+    image: rust:slim-bookworm
+
+  setup_script:
+    - apt-get update -y
+    - apt-get install -y --fix-missing build-essential
 
   build_script:
     - cargo build --release
