@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Rustiator</title>
     <style>
@@ -11,28 +12,65 @@
             height: 100vh;
             margin: 0;
         }
+
         #board1 {
             width: 400px;
         }
     </style>
 </head>
+
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs/loader.min.js"></script>
+    <script src="/js/utils.js"></script>
     <div id="container" style="width:800px; height:600px;"></div>
-    <button id="submitBot">Submit Bot</button>
+    <form id="submitBot">
+        <label for="wordInput">Bot Name:</label>
+        <input type="text" id="nameInput" name="nameInput" value="{{bot_name}}">
+        <input type="submit" value="Submit">
+    </form>
     <script>
+        var editor;
+        var botName = "{{bot_name}}";
 
-        window.onload = async function() {
+        window.onload = async function () {
             // Require function to initialize Monaco
-            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs' }});
-            require(["vs/editor/editor.main"], async function() {
-                monaco.editor.create(document.getElementById('container'), {
-                    value: await fetch('/template.lua').then(response => response.text()),
+            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.23.0/min/vs' } });
+            require(["vs/editor/editor.main"], async function () {
+                editor = monaco.editor.create(document.getElementById('container'), {
+                    value: await (botName == "" ? fetch("/template.lua") : fetch(`/script/${botName}`)).then(response => response.text()),
                     language: 'lua',
                     theme: 'vs-dark',
                 });
             });
         };
+
+
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById("submitBot").addEventListener("submit", async function (event) {
+                event.preventDefault();
+
+                const botName = document.getElementById("nameInput").value;
+                const script = editor.getValue();
+
+                let response = await fetch("/newBot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ botName, script }),
+                });
+
+                if (!response.ok) {
+                    console.error('Error Sending Request:', response.statusText);
+                    console.error('Full Response', response);
+                    return;
+                }
+
+                startGame('playerVsBot', botName);
+            });
+
+        });
     </script>
 </body>
+
 </html>

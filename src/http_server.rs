@@ -24,18 +24,22 @@ use uuid::Uuid;
 
 use shakmaty::uci::Uci;
 
-use crate::chess_engine;
+use crate::chess_engine::{RandomEngine, ToChooseMove};
 use crate::player_vs_bot::PlayerGame;
 use crate::websocket::MyWebSocket;
-use crate::{chess_engine::engine_vs_engine, chess_game::ChessGame};
+use crate::{chess_engine::engine_vs_engine, chess_game::ChessGame, lua::StatelessLuaBot};
 
 pub type GameMap = DashMap<Uuid, Arc<RwLock<ChessGame>>>;
 pub type Connection = Addr<MyWebSocket>;
 pub type SharedState = Arc<RwLock<Vec<Connection>>>;
+pub type SavedBots = DashMap<String, Box<dyn ToChooseMove + Send + Sync>>;
+pub type SavedLuaBots = DashMap<String, StatelessLuaBot>;
 
 #[derive(Deserialize, Debug)]
 struct NewGameArgs {
     mode: String,
+    #[serde(rename = "botName")]
+    bot_name: String,
 }
 
 #[get("/ping")]
@@ -45,10 +49,7 @@ async fn ping() -> impl Responder {
 
 #[post("/new_game")]
 async fn new_game(
-    app_data: web::Data<GameMap>,
-    active_processes: web::Data<Arc<Mutex<HashMap<Uuid, JoinSet<()>>>>>,
-    active_player_games: web::Data<DashMap<Uuid, PlayerGame>>,
-    connections: web::Data<DashMap<Uuid, SharedState>>,
+    app_data: web::Data<GlobalAppData>,
     req_body: Json<NewGameArgs>,
 ) -> impl Responder {
     info!("recieved request!");
@@ -58,15 +59,19 @@ async fn new_game(
     match req_body.mode.as_str() {
         "playerVsBot" => {
             // TODO: allow bot id in request body to select bot to play here
-            let bot = chess_engine::RandomEngine::new();
-            let game = PlayerGame::new(bot);
+            let Some(saved_bot) = app_data.saved_bots.get(&req_body.bot_name) else {
+                return HttpResponse::BadRequest()
+                    .body(format!("No bot named {} found", &req_body.bot_name));
+            };
+            let game = PlayerGame::new(saved_bot.to_choose_move(), &req_body.bot_name);
             info!("Starting Player vs Bot Game: {new_game_id}");
-            active_player_games.insert(new_game_id, game);
+            app_data.active_player_games.insert(new_game_id, game);
         }
         "botVsBot" => {
             let game = Arc::new(RwLock::new(ChessGame::new()));
-            let engine1 = Arc::new(crate::chess_engine::RandomEngine::new());
-            let engine2 = Arc::new(crate::chess_engine::RandomEngine::new());
+            // TODO: add option for second bot so player can select which 2 bots should play each other
+            let engine1 = Arc::new(RandomEngine::new());
+            let engine2 = Arc::new(RandomEngine::new());
 
             let game_clone = game.clone();
             let engine1_clone = engine1.clone();
@@ -81,7 +86,9 @@ async fn new_game(
             });
 
             let new_game_connections: SharedState = Arc::new(RwLock::new(Vec::new()));
-            connections.insert(new_game_id, new_game_connections.clone());
+            app_data
+                .connections
+                .insert(new_game_id, new_game_connections.clone());
             game_join_set.spawn_blocking(move || {
                 loop {
                     let result = match rx.recv() {
@@ -101,11 +108,11 @@ async fn new_game(
 
             // not doing anything with set right now, but save in case in the future
             // we want to do some graceful shutdown logic
-            let mut active_tasks = active_processes.lock().unwrap();
+            let mut active_tasks = app_data.active_processes.lock().unwrap();
             active_tasks.insert(new_game_id, game_join_set);
 
             info!("inserted game {} into active tasks", new_game_id);
-            app_data.insert(new_game_id, game);
+            app_data.active_bot_bot_games.insert(new_game_id, game);
         }
         _ => {
             return HttpResponse::BadRequest().body("Invalid game mode");
@@ -119,14 +126,14 @@ async fn new_game(
 
 #[get("/spectate/{uuid}")]
 async fn spectate_game(
-    app_data: web::Data<GameMap>,
+    app_data: web::Data<GlobalAppData>,
     hb: web::Data<Handlebars<'_>>,
     info: web::Path<Uuid>,
 ) -> impl Responder {
     let game_uuid = info.into_inner();
 
     // Fetch the game data
-    let game_data = match app_data.get(&game_uuid) {
+    let game_data = match app_data.active_bot_bot_games.get(&game_uuid) {
         Some(game) => game,
         None => return HttpResponse::NotFound().body("Game not found"),
     };
@@ -137,15 +144,11 @@ async fn spectate_game(
     };
 
     let position = gd_lock.fen();
-    let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
-    let js_content = std::fs::read_to_string("./client/js/chessboard-1.0.0.js").unwrap();
 
     // Create data to fill the template
     let data = json!({
         "game_id": game_uuid.to_string(),
         "position": position,
-        "style": css_content,
-        "board_js":js_content
     });
 
     // Render the template with the data
@@ -161,10 +164,10 @@ pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     uuid: web::Path<Uuid>, // Extract UUID from the path
-    connections: web::Data<DashMap<Uuid, SharedState>>,
+    app_data: web::Data<GlobalAppData>,
 ) -> Result<HttpResponse, Error> {
     info!("New Connection to Game: {}", &uuid);
-    match connections.get(&uuid) {
+    match app_data.connections.get(&uuid) {
         Some(game_conns) => {
             let game_conns: SharedState = game_conns.clone();
             let ws = MyWebSocket::new(game_conns);
@@ -202,11 +205,11 @@ struct PlayGameResponse {
 #[post("/play/{uuid}")]
 /// Play a given move against a bot
 pub async fn player_vs_bot(
-    active_player_games: web::Data<DashMap<Uuid, PlayerGame>>,
+    app_data: web::Data<GlobalAppData>,
     req_body: Json<PlayGameArgs>,
     uuid: web::Path<Uuid>,
 ) -> actix_web::Result<Json<PlayGameResponse>> {
-    let Some(mut game) = active_player_games.get_mut(&uuid) else {
+    let Some(mut game) = app_data.active_player_games.get_mut(&uuid) else {
         return Err(actix_web::error::ErrorBadRequest(format!(
             "No active game for {uuid}"
         )));
@@ -227,9 +230,9 @@ pub async fn player_vs_bot(
     match game.play_move(player_move) {
         Ok(_) => {}
         Err(e) => {
-            error!("Error playing move: {}", e);
-            return Err(actix_web::error::ErrorBadRequest(format!(
-                "Error Playing Move {}: {e}",
+            error!("Error playing move: {e:?}");
+            return Err(actix_web::error::ErrorInternalServerError(format!(
+                "Error Playing Move {}: {e:?}",
                 req_body.player_move
             )));
         }
@@ -242,25 +245,21 @@ pub async fn player_vs_bot(
 
 #[get("/game/{uuid}")]
 async fn play_game_entry(
-    active_player_games: web::Data<DashMap<Uuid, PlayerGame>>,
+    app_data: web::Data<GlobalAppData>,
     hb: web::Data<Handlebars<'_>>,
     uuid: web::Path<Uuid>,
 ) -> impl Responder {
-    let Some(game) = active_player_games.get(&uuid) else {
+    let Some(game) = app_data.active_player_games.get(&uuid) else {
         return Err(actix_web::error::ErrorBadRequest(format!(
             "No active game for {uuid}"
         )));
     };
 
-    let css_content = std::fs::read_to_string("./client/css/chessboard-1.0.0.min.css").unwrap();
-    let js_content = std::fs::read_to_string("./client/js/chessboard-1.0.0.js").unwrap();
-
     // Create data to fill the template
     let data = json!({
         "game_id": uuid.to_string(),
         "position": game.fen(),
-        "style": css_content,
-        "board_js":js_content
+        "bot_name": game.bot_name,
     });
 
     // Render the template with the data
@@ -272,16 +271,107 @@ async fn play_game_entry(
     Ok(HttpResponse::Ok().content_type("text/html").body(body))
 }
 
+#[derive(Deserialize)]
+struct NewBotRequest {
+    script: String,
+    #[serde(rename = "botName")]
+    bot_name: String,
+}
+
+#[derive(Serialize)]
+struct NewBotResponse {}
+
+#[post("/newBot")]
+async fn new_bot(
+    request: Json<NewBotRequest>,
+    app_data: web::Data<GlobalAppData>,
+) -> actix_web::Result<Json<NewBotResponse>> {
+    let request = request.0;
+    let bot = StatelessLuaBot::try_new(request.script)
+        .map_err(|e| actix_web::error::ErrorBadRequest(format!("Failed to initialize Bot: {e}")))?;
+
+    // TODO: for now this will overwrite other saved bots of the same name.
+    // I think this is what we want for now. But later we will need to block this and
+    // then add an ability to edit already saved bots
+    app_data
+        .saved_bots
+        .insert(request.bot_name.clone(), Box::new(bot.clone()));
+    app_data.saved_lua_bots.insert(request.bot_name, bot);
+
+    Ok(Json(NewBotResponse {}))
+}
+
+// #[get("/editBot/{bot_name}")]
+async fn edit_bot(
+    request: actix_web::HttpRequest,
+    hb: web::Data<Handlebars<'_>>,
+) -> impl Responder {
+    // This will be "" in the case where they are making a new bot
+    let bot_name = request.match_info().query("bot_name");
+    // Create data to fill the template
+    let data = json!({
+        "bot_name": bot_name,
+    });
+
+    // Render the template with the data
+    let body = hb.render("editor_template", &data).unwrap_or_else(|err| {
+        error!("Template rendering error: {}", err);
+        "Template rendering error".to_string()
+    });
+
+    HttpResponse::Ok().content_type("text/html").body(body)
+}
+
+#[get("script/{bot_name}")]
+async fn get_script(
+    bot_name: web::Path<String>,
+    app_data: web::Data<GlobalAppData>,
+) -> impl Responder {
+    let script = app_data
+        .saved_lua_bots
+        .get(&bot_name.to_string())
+        .map(|bot| bot.script.clone())
+        .unwrap_or_else(|| {
+            log::warn!(
+                r#"Tried to get script for nonexistant bot "{bot_name}" defaulting to template"#
+            );
+            include_str!("../client/template.lua").to_string()
+        });
+    script
+}
+
+#[derive(Serialize)]
+struct BotNamesResponse {
+    bot_names: Vec<String>,
+}
+
+#[get("/botNames")]
+async fn get_bots(app_data: web::Data<GlobalAppData>) -> Json<BotNamesResponse> {
+    let bot_names = app_data
+        .saved_bots
+        .iter()
+        .map(|entry| entry.key().to_string())
+        .collect();
+    Json(BotNamesResponse { bot_names })
+}
+
+pub struct GlobalAppData {
+    active_processes: Arc<Mutex<HashMap<Uuid, JoinSet<()>>>>,
+    active_player_games: DashMap<Uuid, PlayerGame>,
+    connections: DashMap<Uuid, SharedState>,
+    active_bot_bot_games: GameMap,
+    saved_bots: SavedBots,
+    saved_lua_bots: SavedLuaBots,
+}
+
 pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     // Init an empty hashmap to store all the ongoing processes
-    let active = Arc::new(Mutex::new(HashMap::<Uuid, JoinSet<()>>::new()));
-    let active_tasks = web::Data::new(active);
+    let active_processes = Arc::new(Mutex::new(HashMap::<Uuid, JoinSet<()>>::new()));
 
-    let player_bot_games = web::Data::new(DashMap::<Uuid, PlayerGame>::new());
+    let active_player_games = DashMap::<Uuid, PlayerGame>::new();
 
     // Initialize an empty hashmap which maps UUID to ChessGame
-    let games: GameMap = DashMap::new();
-    let games_data = web::Data::new(games);
+    let active_bot_bot_games: GameMap = DashMap::new();
 
     let mut handlebars = Handlebars::new();
     handlebars
@@ -290,11 +380,27 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
     handlebars
         .register_template_file("game_template", "./client/game.html")
         .unwrap(); // lmao fix
+    handlebars
+        .register_template_file("editor_template", "./client/text_editor.html")
+        .unwrap(); // lol don't fix?
     let handlebars_ref = web::Data::new(handlebars);
 
     // Active Spectator connections
     let connections: DashMap<Uuid, SharedState> = DashMap::new();
-    let connections_data = web::Data::new(connections);
+
+    let saved_bots: SavedBots = DashMap::new();
+    saved_bots.insert(String::from("RustRandomBot"), Box::new(RandomEngine::new()));
+
+    let saved_lua_bots = DashMap::new();
+
+    let app_data = web::Data::new(GlobalAppData {
+        connections,
+        active_processes,
+        active_bot_bot_games,
+        active_player_games,
+        saved_bots,
+        saved_lua_bots,
+    });
 
     info!("Starting server on {}:{}", hostname, port);
     let allowed_origin = format!("http://{}:{}", &hostname, &port);
@@ -314,18 +420,18 @@ pub async fn start_server(hostname: String, port: u16) -> std::io::Result<()> {
         // routes actually does matter here
         App::new()
             .wrap(cors)
-            .app_data(games_data.clone()) // Add the shared state to the app
+            .app_data(app_data.clone()) // Add the shared state to the app
             .app_data(handlebars_ref.clone())
-            .app_data(active_tasks.clone())
-            .app_data(connections_data.clone())
-            .app_data(player_bot_games.clone())
             .route("/ws/{uuid}", web::get().to(ws_index))
             .service(spectate_game)
             .service(new_game)
             .service(player_vs_bot)
             .service(play_game_entry)
+            .service(new_bot)
+            .service(get_script)
+            .service(get_bots)
+            .service(web::resource(["/editBot", "/editBot/{bot_name}"]).to(edit_bot))
             .service(fs::Files::new("/", "./client/").index_file("index.html"))
-            // .service(fs::Files::new("/img", "./client/img"))
             .service(
                 web::scope("/img")
                     .wrap(

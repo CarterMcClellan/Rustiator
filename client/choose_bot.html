@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+
+<link rel="stylesheet" type="text/css" href="/css/botButtons.css">
+
+<head>
+    <title>Rustiator</title>
+</head>
+
+<body>
+    <h2>Choose Which Bot To Play</h2>
+    <div id="botButtons"></div>
+</body>
+<script src="/js/utils.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', fetchBots);
+
+    function fetchBots() {
+        fetch('/botNames')
+            .then(response => response.json())
+            .then(data => {
+                createButtons(data.bot_names);
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function createButtons(bots) {
+        const container = document.getElementById('botButtons');
+        bots.forEach(botName => {
+            let button = document.createElement('button');
+            button.textContent = botName;
+            button.onclick = function () { startGame('playerVsBot', botName); };
+            container.appendChild(button);
+        });
+    }
+
+</script>
+
+</html>

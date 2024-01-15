@@ -1,6 +1,10 @@
 # Use a Rust image to build the application
 FROM rust:slim-bookworm as builder
 
+RUN apt-get update -y && \
+    apt-get install -y --fix-missing \
+    build-essential
+
 # Copy your manifests
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
@@ -12,6 +16,7 @@ RUN rm src/*.rs
 
 # Copy Deps
 COPY ./src ./src
+COPY ./client ./client
 RUN touch ./src/main.rs
 RUN touch ./src/lib.rs
 

@@ -1,10 +1,63 @@
 <!DOCTYPE html>
 <html>
+
+<style>
+    /* The Modal (background) */
+.modal {
+    display: none;
+    /* Hidden by default */
+    position: fixed;
+    /* Stay in place */
+    z-index: 1;
+    /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%;
+    /* Full width */
+    height: 100%;
+    /* Full height */
+    overflow: auto;
+    /* Enable scroll if needed */
+    background-color: rgb(0, 0, 0);
+    /* Fallback color */
+    background-color: rgba(0, 0, 0, 0.4);
+    /* Black w/ opacity */
+}
+
+/* Modal Content */
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    /* 15% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Aligns items horizontally in the center */
+    justify-content: center;
+    /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+</style>
+
 <head>
     <title>Rustiator</title>
-    <style>
-        {{{style}}}
-    </style>
+    <link rel="stylesheet" type="text/css" href="/css/chessboard-1.0.0.min.css">
     <style>
         body {
             display: flex;
@@ -14,17 +67,28 @@
             height: 100vh;
             margin: 0;
         }
+
         #board1 {
             width: 400px;
         }
     </style>
     <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+    <script src="/js/chessboard-1.0.0.js"></script>
 </head>
+
 <body>
+    <h3>{{bot_name}}</h3>
     <div id="board1"></div>
-    <script>
-        {{{board_js}}}
-    </script>
+    <!-- The Modal -->
+    <div id="errorPopup" class="modal">
+
+        <!-- Modal content -->
+        <div class="modal-content">
+            <p id="errorText"></p>
+            <button onclick="location.href='/editBot/{{bot_name}}'">Edit Bot</button>
+        </div>
+
+    </div>
     <script>
         var board = null;
         var gameId = "{{game_id}}";
@@ -45,12 +109,12 @@
 
         // Called when you let go of the piece
         async function onDrop(
-          draggedPieceSource,
-          draggedPieceDest,
-          draggedPiece,
-          newPosition,
-          oldPosition,
-          currentOrientation
+            draggedPieceSource,
+            draggedPieceDest,
+            draggedPiece,
+            newPosition,
+            oldPosition,
+            currentOrientation
         ) {
             if (draggedPieceSource === draggedPieceDest) {
                 return;
@@ -87,6 +151,14 @@
             } else {
                 console.error('Error Sending Request:', response.statusText);
                 console.error('Full Response', response);
+                if (response.status ==  400) {
+                    // here the player made an invalide move.
+                    // We will just return and reset the board to the original state
+                    return;
+                }
+                // otherwise the bot made an error.
+                // We will give them a pop up and allow them to go fix the bot
+                errorPopUp(await response.text())
             }
         }
 
@@ -100,6 +172,25 @@
 
         board = Chessboard('board1', config);
 
+
+        var modal = document.getElementById("errorPopup");
+
+        function errorPopUp(msg) {
+            document.getElementById("errorText").textContent = msg;
+
+            // active popup
+            modal.style.display = "block";
+        }
+
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function (event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+
     </script>
 </body>
+
 </html>

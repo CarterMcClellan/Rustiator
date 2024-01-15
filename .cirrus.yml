@@ -3,6 +3,10 @@ task:
   container:
     image: rust:slim-bookworm
 
+  setup_script:
+    - apt-get update -y
+    - apt-get install -y --fix-missing build-essential
+
   build_script:
     - cargo build --release
 
